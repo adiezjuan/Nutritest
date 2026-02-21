@@ -1,0 +1,27 @@
+# Core data science
+pandas==2.2.2
+numpy==1.26.4
+
+# Machine Learning
+scikit-learn==1.5.1
+xgboost==2.1.1  # Alternativa más potente al GradientBoosting
+
+# Visualización (opcional, para análisis)
+matplotlib==3.9.2
+seaborn==0.13.2
+plotly==5.22.0
+
+# Persistencia modelos
+joblib==1.4.2
+
+# Para API futura (opcional)
+fastapi==0.115.0
+uvicorn==0.30.3
+
+# Para explicabilidad (opcional)
+shap==0.47.0
+
+streamlit==1.32.2
+numpy==1.26.4
+
+
