@@ -826,7 +826,7 @@ with st.expander("Tabla de ponderación actual", expanded=False):
 
 st.markdown("---")
 st.subheader("Tabla de referencia por defecto")
-st.markdown("---")
+# st.markdown("---")
 st.subheader("Variables alteradas")
 
 with st.expander("Ver variables fuera de rango", expanded=True):
