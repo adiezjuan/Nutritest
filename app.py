@@ -914,8 +914,12 @@ with st.expander("Ver reglas de prioridad y boosts", expanded=False):
         use_container_width=True,
         hide_index=True,
     )
+st.markdown("---")
+st.subheader("Variables fuera de rango")
+
 with st.expander("Ver variables fuera de rango", expanded=True):
     altered = []
+
     for key, info in variable_scores.items():
         classification = info.get("classification", "missing")
         if classification in ("high", "critical_high", "low", "critical_low"):
@@ -927,46 +931,60 @@ with st.expander("Ver variables fuera de rango", expanded=True):
                 "value": info.get("value"),
                 "classification": classification,
                 "range": format_reference_range(ref_cfg),
-                "badge": classification_to_badge(classification),
             })
 
     if not altered:
-        st.write("✅ No hay variables alteradas en los inputs disponibles.")
+        st.success("No hay variables fuera de rango en los inputs disponibles.")
     else:
         for item in altered:
             arrow = classification_to_arrow(item["classification"])
+            badge = classification_to_badge(item["classification"])
+
+            value_txt = "—" if is_nan(item["value"]) else f"{item['value']}"
+
             st.markdown(
                 f"""
                 <div style="
-                    padding:0.65rem 0.8rem;
-                    margin:0.4rem 0;
-                    border:1px solid #e6e6e6;
-                    border-radius:0.7rem;
-                    background:#ffffff;
+                    padding: 0.75rem 0.9rem;
+                    margin: 0.45rem 0;
+                    border: 1px solid #e6e6e6;
+                    border-radius: 0.75rem;
+                    background: white;
                 ">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+                    <div style="
+                        display:flex;
+                        justify-content:space-between;
+                        align-items:flex-start;
+                        gap:1rem;
+                    ">
                         <div>
-                            <div style="font-weight:700; font-size:1rem;">{item['label']}</div>
-                            <div style="color:#666; font-size:0.88rem;">{item['domain']}</div>
+                            <div style="font-weight:700; font-size:1rem; margin-bottom:0.15rem;">
+                                {item['label']}
+                            </div>
+                            <div style="color:#666; font-size:0.88rem;">
+                                {item['domain']}
+                            </div>
                         </div>
-                        <div>{item['badge']}</div>
+                        <div>
+                            {badge}
+                        </div>
                     </div>
 
                     <div style="
                         display:grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap:0.5rem 1rem;
-                        margin-top:0.55rem;
-                        font-size:0.95rem;
+                        grid-template-columns: repeat(2, minmax(140px, 1fr));
+                        gap: 0.5rem 1rem;
+                        margin-top: 0.7rem;
+                        font-size: 0.95rem;
                     ">
-                        <div><b>Valor:</b> {item['value']} {arrow}</div>
+                        <div><b>Valor:</b> {value_txt} {arrow}</div>
                         <div><b>Rango:</b> {item['range']}</div>
                     </div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-
+   
 st.markdown("---")
 st.subheader("Tabla de referencia por defecto")
 
