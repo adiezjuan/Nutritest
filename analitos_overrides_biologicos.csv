@@ -1,0 +1,15 @@
+Parametro_backend,Sexo_biologico,Valor_min,Valor_max,Categoria_alto,Categoria_bajo,Nota_override
+hb_g_dl,M,13.0,18.0,Hemoglobina alta,Anemia,Valores biológicos masculinos habituales
+hb_g_dl,F,12.0,16.0,Hemoglobina alta,Anemia,Valores biológicos femeninos habituales
+hct_pct,M,40,55,Hematocrito alto,Hematocrito bajo,Referencia biológica masculina
+hct_pct,F,36,48,Hematocrito alto,Hematocrito bajo,Referencia biológica femenina
+rbc_x10_6_mm3,M,4.5,6.1,Eritrocitosis,Anemia hematológica,Referencia CBC masculina
+rbc_x10_6_mm3,F,4.0,5.2,Eritrocitosis,Anemia hematológica,Referencia CBC femenina
+hdl_mg_dl,M,40,,HDL óptimo,HDL bajo,Corte biológico masculino
+hdl_mg_dl,F,50,,HDL óptimo,HDL bajo,Corte biológico femenino
+creatinine_mg_dl,M,0.7,1.3,Creatinina elevada,Creatinina baja,Interpretación biológica masculina
+creatinine_mg_dl,F,0.5,1.1,Creatinina elevada,Creatinina baja,Interpretación biológica femenina
+ferritin_ng_ml,M,30,400,Ferritina alta,Ferropenia,Rango masculino habitual
+ferritin_ng_ml,F,15,150,Ferritina alta,Ferropenia,Rango femenino habitual
+waist_cm,M,0,94,Obesidad abdominal,,Corte de riesgo aumentado en varón
+waist_cm,F,0,80,Obesidad abdominal,,Corte de riesgo aumentado en mujer
