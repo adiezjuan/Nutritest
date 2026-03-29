@@ -54,54 +54,10 @@ def bucket(score: float) -> str:
     return "Alto"
 
 
-def mgdl_to_display(x_mgdl: float, convert_group: str, unit_mode: str) -> float:
-    if is_nan(x_mgdl):
-        return x_mgdl
-    if unit_mode == "mg/dL":
-        return x_mgdl
-    if convert_group == "lipids":
-        return x_mgdl * LIPID_MGDL_TO_MMOLL
-    if convert_group == "triglycerides":
-        return x_mgdl * TG_MGDL_TO_MMOLL
-    if convert_group == "glucose":
-        return x_mgdl * GLU_MGDL_TO_MMOLL
-    return x_mgdl
-
-
-def display_to_mgdl(x_display: float, convert_group: str, unit_mode: str) -> float:
-    if is_nan(x_display):
-        return x_display
-    if unit_mode == "mg/dL":
-        return x_display
-    if convert_group == "lipids":
-        return x_display / LIPID_MGDL_TO_MMOLL
-    if convert_group == "triglycerides":
-        return x_display / TG_MGDL_TO_MMOLL
-    if convert_group == "glucose":
-        return x_display / GLU_MGDL_TO_MMOLL
-    return x_display
-
-def get_default_input_value(key, current_values=None, default_sex="M"):
-    current_values = current_values or {}
-    sex = current_values.get("sex", default_sex)
-
-    cfg = REFERENCE_RANGES.get(key)
-    if cfg is None:
-        return ""
-
-    if "sex_specific" in cfg:
-        sex_cfg = cfg["sex_specific"].get(sex, cfg["sex_specific"].get("X", {}))
-        val = sex_cfg.get("target_default")
-    else:
-        val = cfg.get("target_default")
-
-    if val is None:
-        return ""
-    return str(val)
-
 def pretty_variable_label(key: str) -> str:
     ref = REFERENCE_RANGES.get(key, {})
     return ref.get("label", key)
+
 
 def variable_main_domain(key: str) -> str:
     for domain_key, cfg in DOMAIN_MASTER.items():
@@ -109,114 +65,18 @@ def variable_main_domain(key: str) -> str:
             if var.get("key") == key:
                 return cfg.get("label", domain_key)
     return "Derivado/otro"
-    
-# -----------------------------
-# UI helpers
-# -----------------------------
-def group_by_level(schema):
-    groups = {"essential": [], "precision": [], "advanced": []}
-    for item in schema:
-        lvl = item.get("level", "advanced")
-        groups.setdefault(lvl, []).append(item)
-    return groups
 
 
-def display_unit_label(item, unit_mode):
-    unit = item.get("unit", "")
-    cg = item.get("convert_group")
-    if cg in ("lipids", "triglycerides", "glucose") and unit == "mg/dL" and unit_mode == "mmol/L":
-        return "mmol/L"
-    return unit
+def domain_delta_label(score: float) -> str:
+    if is_nan(score):
+        return "—"
+    if score < 30:
+        return "- Bajo"
+    if score < 60:
+        return "+ Moderado"
+    return "+ Alto"
 
 
-def input_widget(item, unit_mode, current_values=None, key_prefix="inp_"):
-    current_values = current_values or {}
-
-    key = item["key"]
-    label = item["label"]
-    unit = display_unit_label(item, unit_mode)
-    input_type = item.get("input_type", "number")
-    convert_group = item.get("convert_group")
-
-    if input_type == "select":
-        options = item.get("options", [])
-        option_labels = item.get("option_labels", {})
-        shown = [option_labels.get(opt, opt) for opt in options]
-
-        # Default inicial: Hombre
-        default_value = "M" if "M" in options else options[0]
-        default_index = options.index(default_value)
-
-        selected = st.selectbox(label, shown, index=default_index, key=f"{key_prefix}{key}")
-        reverse = {option_labels.get(opt, opt): opt for opt in options}
-        return reverse[selected]
-
-    default_str = get_default_input_value(key, current_values=current_values, default_sex="M")
-
-    # Si la unidad visible está en mmol/L, convertimos también el default
-    if default_str != "":
-        try:
-            default_numeric = float(default_str)
-            if convert_group in ("lipids", "triglycerides", "glucose") and unit_mode == "mmol/L":
-                default_numeric = mgdl_to_display(default_numeric, convert_group, unit_mode)
-                default_str = f"{default_numeric:.2f}"
-        except ValueError:
-            pass
-
-    raw = st.text_input(
-        f"{label} ({unit})",
-        value=default_str,
-        key=f"{key_prefix}{key}",
-        placeholder="vacío = desconocido",
-    )
-    val = parse_float_or_nan(raw)
-
-    if convert_group in ("lipids", "triglycerides", "glucose"):
-        val = display_to_mgdl(val, convert_group, unit_mode)
-
-    return val
-
-# -----------------------------
-# Derived metrics
-# -----------------------------
-def compute_derived(values):
-    tg = values.get("triglycerides_mg_dl", np.nan)
-    hdl = values.get("hdl_mg_dl", np.nan)
-    chol = values.get("chol_total_mg_dl", np.nan)
-    glu = values.get("glucose_mg_dl", np.nan)
-    ins = values.get("insulin_uIU_ml", np.nan)
-    neut = values.get("neut_abs_x10_3_mm3", np.nan)
-    lymph = values.get("lymph_abs_x10_3_mm3", np.nan)
-
-    tg_hdl_ratio = np.nan
-    if not is_nan(tg) and not is_nan(hdl) and hdl > 0:
-        tg_hdl_ratio = tg / hdl
-
-    non_hdl = np.nan
-    if not is_nan(chol) and not is_nan(hdl):
-        non_hdl = chol - hdl
-
-    homa_ir = np.nan
-    if not is_nan(glu) and not is_nan(ins):
-        homa_ir = (glu * ins) / 405.0
-
-    nlr = np.nan
-    if not is_nan(neut) and not is_nan(lymph) and lymph > 0:
-        nlr = neut / lymph
-
-    return {
-        "tg_hdl_ratio": tg_hdl_ratio,
-        "non_hdl_mg_dl": non_hdl,
-        "homa_ir": homa_ir,
-        "nlr": nlr,
-    }
-
-
-def merge_values(values, derived):
-    merged = dict(values)
-    merged.update(derived)
-    return merged
-##Nuevas funciones
 def classification_to_badge(classification: str) -> str:
     if classification in ("high", "critical_high"):
         label = "↑ Alto" if classification == "high" else "↑ Muy alto"
@@ -265,6 +125,161 @@ def format_reference_range(ref_cfg):
     if ref_high is not None:
         return f"<= {ref_high}"
     return "—"
+
+
+def mgdl_to_display(x_mgdl: float, convert_group: str, unit_mode: str) -> float:
+    if is_nan(x_mgdl):
+        return x_mgdl
+    if unit_mode == "mg/dL":
+        return x_mgdl
+    if convert_group == "lipids":
+        return x_mgdl * LIPID_MGDL_TO_MMOLL
+    if convert_group == "triglycerides":
+        return x_mgdl * TG_MGDL_TO_MMOLL
+    if convert_group == "glucose":
+        return x_mgdl * GLU_MGDL_TO_MMOLL
+    return x_mgdl
+
+
+def display_to_mgdl(x_display: float, convert_group: str, unit_mode: str) -> float:
+    if is_nan(x_display):
+        return x_display
+    if unit_mode == "mg/dL":
+        return x_display
+    if convert_group == "lipids":
+        return x_display / LIPID_MGDL_TO_MMOLL
+    if convert_group == "triglycerides":
+        return x_display / TG_MGDL_TO_MMOLL
+    if convert_group == "glucose":
+        return x_display / GLU_MGDL_TO_MMOLL
+    return x_display
+
+
+def get_default_input_value(key, current_values=None, default_sex="M"):
+    current_values = current_values or {}
+    sex = current_values.get("sex", default_sex)
+
+    cfg = REFERENCE_RANGES.get(key)
+    if cfg is None:
+        return ""
+
+    if "sex_specific" in cfg:
+        sex_cfg = cfg["sex_specific"].get(sex, cfg["sex_specific"].get("X", {}))
+        val = sex_cfg.get("target_default")
+    else:
+        val = cfg.get("target_default")
+
+    if val is None:
+        return ""
+    return str(val)
+
+
+# -----------------------------
+# UI helpers
+# -----------------------------
+def group_by_level(schema):
+    groups = {"essential": [], "precision": [], "advanced": []}
+    for item in schema:
+        lvl = item.get("level", "advanced")
+        groups.setdefault(lvl, []).append(item)
+    return groups
+
+
+def display_unit_label(item, unit_mode):
+    unit = item.get("unit", "")
+    cg = item.get("convert_group")
+    if cg in ("lipids", "triglycerides", "glucose") and unit == "mg/dL" and unit_mode == "mmol/L":
+        return "mmol/L"
+    return unit
+
+
+def input_widget(item, unit_mode, current_values=None, key_prefix="inp_"):
+    current_values = current_values or {}
+
+    key = item["key"]
+    label = item["label"]
+    unit = display_unit_label(item, unit_mode)
+    input_type = item.get("input_type", "number")
+    convert_group = item.get("convert_group")
+
+    if input_type == "select":
+        options = item.get("options", [])
+        option_labels = item.get("option_labels", {})
+        shown = [option_labels.get(opt, opt) for opt in options]
+
+        default_value = "M" if "M" in options else options[0]
+        default_index = options.index(default_value)
+
+        selected = st.selectbox(label, shown, index=default_index, key=f"{key_prefix}{key}")
+        reverse = {option_labels.get(opt, opt): opt for opt in options}
+        return reverse[selected]
+
+    default_str = get_default_input_value(key, current_values=current_values, default_sex="M")
+
+    if default_str != "":
+        try:
+            default_numeric = float(default_str)
+            if convert_group in ("lipids", "triglycerides", "glucose") and unit_mode == "mmol/L":
+                default_numeric = mgdl_to_display(default_numeric, convert_group, unit_mode)
+                default_str = f"{default_numeric:.2f}"
+        except ValueError:
+            pass
+
+    raw = st.text_input(
+        f"{label} ({unit})",
+        value=default_str,
+        key=f"{key_prefix}{key}",
+        placeholder="vacío = desconocido",
+    )
+    val = parse_float_or_nan(raw)
+
+    if convert_group in ("lipids", "triglycerides", "glucose"):
+        val = display_to_mgdl(val, convert_group, unit_mode)
+
+    return val
+
+
+# -----------------------------
+# Derived metrics
+# -----------------------------
+def compute_derived(values):
+    tg = values.get("triglycerides_mg_dl", np.nan)
+    hdl = values.get("hdl_mg_dl", np.nan)
+    chol = values.get("chol_total_mg_dl", np.nan)
+    glu = values.get("glucose_mg_dl", np.nan)
+    ins = values.get("insulin_uIU_ml", np.nan)
+    neut = values.get("neut_abs_x10_3_mm3", np.nan)
+    lymph = values.get("lymph_abs_x10_3_mm3", np.nan)
+
+    tg_hdl_ratio = np.nan
+    if not is_nan(tg) and not is_nan(hdl) and hdl > 0:
+        tg_hdl_ratio = tg / hdl
+
+    non_hdl = np.nan
+    if not is_nan(chol) and not is_nan(hdl):
+        non_hdl = chol - hdl
+
+    homa_ir = np.nan
+    if not is_nan(glu) and not is_nan(ins):
+        homa_ir = (glu * ins) / 405.0
+
+    nlr = np.nan
+    if not is_nan(neut) and not is_nan(lymph) and lymph > 0:
+        nlr = neut / lymph
+
+    return {
+        "tg_hdl_ratio": tg_hdl_ratio,
+        "non_hdl_mg_dl": non_hdl,
+        "homa_ir": homa_ir,
+        "nlr": nlr,
+    }
+
+
+def merge_values(values, derived):
+    merged = dict(values)
+    merged.update(derived)
+    return merged
+
 
 # -----------------------------
 # Reference-based variable scoring
@@ -539,7 +554,6 @@ def apply_priority_rules(domain_scores, all_values):
     adjusted = {k: dict(v) for k, v in domain_scores.items()}
     reasons = []
 
-    # primero boosts
     for rule in applied_sorted:
         if rule.get("type") == "boost":
             domain = rule["domain"]
@@ -547,7 +561,6 @@ def apply_priority_rules(domain_scores, all_values):
                 adjusted[domain]["score"] = clamp(adjusted[domain]["score"] + rule.get("boost", 0))
                 reasons.append(rule["reason"])
 
-    # luego override más fuerte
     override_rules = [r for r in applied_sorted if r.get("type") == "override"]
     forced_domain = None
     forced_reason = None
@@ -676,6 +689,11 @@ sleep = st.sidebar.selectbox("Sueño", ["Bueno", "Irregular", "Malo"], index=0)
 meds = st.sidebar.checkbox("Medicación crónica", value=False)
 st.sidebar.caption("Cualquier cambio en inputs o umbrales recalcula automáticamente el output.")
 
+if st.sidebar.button("Reset a valores normales"):
+    for item in SCHEMA_V3:
+        st.session_state.pop(f"inp_{item['key']}", None)
+    st.rerun()
+
 # -----------------------------
 # Input rendering
 # -----------------------------
@@ -691,6 +709,7 @@ def render_level(tab, items, cols=3):
         for idx, item in enumerate(items):
             with cols_list[idx % cols]:
                 values[item["key"]] = input_widget(item, unit_mode, current_values=values)
+
 
 render_level(tab_essential, levels["essential"])
 render_level(tab_precision, levels["precision"])
@@ -759,7 +778,12 @@ if ranked_domains:
     cols = st.columns(min(6, len(ranked_domains)))
     for col, domain in zip(cols, ranked_domains[:6]):
         with col:
-            st.metric(domain["label"], f"{domain['score']:.1f}", bucket(domain["score"]))
+            st.metric(
+                label=domain["label"],
+                value=f"{domain['score']:.1f}",
+                delta=domain_delta_label(domain["score"]),
+                delta_color="inverse",
+            )
             st.caption(f"Cobertura: {int(domain['coverage'] * 100)}%")
 
 st.markdown("---")
@@ -821,7 +845,7 @@ with st.expander("Variables usadas por dominio", expanded=False):
             st.markdown(
                 f"""
                 <div style="padding:0.45rem 0.65rem; margin:0.35rem 0; border:1px solid #e8e8e8; border-radius:0.6rem;">
-                    <div style="font-weight:600;">{key}</div>
+                    <div style="font-weight:600;">{pretty_variable_label(key)}</div>
                     <div style="margin-top:0.2rem;">
                         <span style="font-size:1rem;"><b>Valor:</b> {val_txt} {arrow}</span>
                         <span style="margin-left:1rem;"><b>Rango:</b> {ref_range}</span>
@@ -833,13 +857,9 @@ with st.expander("Variables usadas por dominio", expanded=False):
                 """,
                 unsafe_allow_html=True
             )
+
 with st.expander("Tabla de ponderación actual", expanded=False):
     st.json(DOMAIN_MASTER)
-
-st.markdown("---")
-st.subheader("Tabla de referencia por defecto")
-# st.markdown("---")
-st.subheader("Variables alteradas")
 
 st.markdown("---")
 st.subheader("Variables alteradas")
@@ -896,6 +916,10 @@ with st.expander("Ver variables fuera de rango", expanded=True):
                 """,
                 unsafe_allow_html=True
             )
+
+st.markdown("---")
+st.subheader("Tabla de referencia por defecto")
+
 with st.expander("Ver rangos, objetivos y umbrales", expanded=False):
     for key, cfg in REFERENCE_RANGES.items():
         st.markdown(f"### {cfg.get('label', key)}")
@@ -923,6 +947,3 @@ with st.expander("Ver rangos, objetivos y umbrales", expanded=False):
                 f"critical_low={cfg.get('critical_low')}, "
                 f"critical_high={cfg.get('critical_high')}"
             )
-st.markdown("---")
-st.subheader("Variables alteradas")
-
