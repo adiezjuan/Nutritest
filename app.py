@@ -778,7 +778,41 @@ with st.expander("Tabla de ponderación actual", expanded=False):
 
 st.markdown("---")
 st.subheader("Tabla de referencia por defecto")
+st.markdown("---")
+st.subheader("Variables alteradas")
 
+with st.expander("Ver variables fuera de rango", expanded=True):
+    altered = []
+    for key, info in variable_scores.items():
+        classification = info.get("classification", "missing")
+        if classification in ("high", "critical_high", "low", "critical_low"):
+            ref_cfg = get_reference_config(key, all_values)
+            altered.append({
+                "key": key,
+                "value": info.get("value"),
+                "classification": classification,
+                "range": format_reference_range(ref_cfg),
+                "badge": classification_to_badge(classification),
+            })
+
+    if not altered:
+        st.write("✅ No hay variables alteradas en los inputs disponibles.")
+    else:
+        for item in altered:
+            arrow = classification_to_arrow(item["classification"])
+            st.markdown(
+                f"""
+                <div style="padding:0.45rem 0.65rem; margin:0.35rem 0; border:1px solid #e8e8e8; border-radius:0.6rem;">
+                    <div style="font-weight:600;">{item['key']}</div>
+                    <div style="margin-top:0.2rem;">
+                        <span><b>Valor:</b> {item['value']} {arrow}</span>
+                        <span style="margin-left:1rem;"><b>Rango:</b> {item['range']}</span>
+                    </div>
+                    <div style="margin-top:0.35rem;">{item['badge']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 with st.expander("Ver rangos, objetivos y umbrales", expanded=False):
     for key, cfg in REFERENCE_RANGES.items():
         st.markdown(f"### {cfg.get('label', key)}")
