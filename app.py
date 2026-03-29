@@ -81,7 +81,23 @@ def display_to_mgdl(x_display: float, convert_group: str, unit_mode: str) -> flo
         return x_display / GLU_MGDL_TO_MMOLL
     return x_display
 
+def get_default_input_value(key, current_values=None, default_sex="M"):
+    current_values = current_values or {}
+    sex = current_values.get("sex", default_sex)
 
+    cfg = REFERENCE_RANGES.get(key)
+    if cfg is None:
+        return ""
+
+    if "sex_specific" in cfg:
+        sex_cfg = cfg["sex_specific"].get(sex, cfg["sex_specific"].get("X", {}))
+        val = sex_cfg.get("target_default")
+    else:
+        val = cfg.get("target_default")
+
+    if val is None:
+        return ""
+    return str(val)
 # -----------------------------
 # UI helpers
 # -----------------------------
