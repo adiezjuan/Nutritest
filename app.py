@@ -746,17 +746,33 @@ with st.expander("Variables usadas por dominio", expanded=False):
         if not d["used"]:
             st.write("- Sin datos suficientes")
             continue
+
         for item in sorted(d["used"], key=lambda x: x["weight"], reverse=True):
+            key = item["key"]
             val = item["value"]
             val_txt = "—" if is_nan(val) else f"{val}"
-            st.write(
-                f"- {item['key']}: valor={val_txt}, "
-                f"score={item['score']:.1f}, "
-                f"peso={item['weight']}, "
-                f"rol={item['role']}, "
-                f"clasificación={item['classification']}"
-            )
+            classification = item["classification"]
+            arrow = classification_to_arrow(classification)
 
+            ref_cfg = get_reference_config(key, all_values)
+            ref_range = format_reference_range(ref_cfg)
+            badge = classification_to_badge(classification)
+
+            st.markdown(
+                f"""
+                <div style="padding:0.45rem 0.65rem; margin:0.35rem 0; border:1px solid #e8e8e8; border-radius:0.6rem;">
+                    <div style="font-weight:600;">{key}</div>
+                    <div style="margin-top:0.2rem;">
+                        <span style="font-size:1rem;"><b>Valor:</b> {val_txt} {arrow}</span>
+                        <span style="margin-left:1rem;"><b>Rango:</b> {ref_range}</span>
+                        <span style="margin-left:1rem;"><b>Peso:</b> {item['weight']}</span>
+                        <span style="margin-left:1rem;"><b>Rol:</b> {item['role']}</span>
+                    </div>
+                    <div style="margin-top:0.35rem;">{badge}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 with st.expander("Tabla de ponderación actual", expanded=False):
     st.json(DOMAIN_MASTER)
 
