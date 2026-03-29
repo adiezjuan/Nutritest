@@ -630,8 +630,7 @@ def render_level(tab, items, cols=3):
         cols_list = st.columns(cols)
         for idx, item in enumerate(items):
             with cols_list[idx % cols]:
-                values[item["key"]] = input_widget(item, unit_mode)
-
+                values[item["key"]] = input_widget(item, unit_mode, current_values=values)
 
 render_level(tab_essential, levels["essential"])
 render_level(tab_precision, levels["precision"])
