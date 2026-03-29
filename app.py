@@ -2,11 +2,13 @@ import numpy as np
 import streamlit as st
 
 from lab_schema_v3 import SCHEMA_V3
-from reference_ranges import REFERENCE_RANGES
 from scoring_tables import DOMAIN_MASTER
 from priority_rules import PRIORITY_RULES
 from output_rules import DOMAIN_OUTPUT_RULES, PROFILE_COMBINATIONS
+from reference_loader import load_reference_tables
 
+
+REFERENCE_RANGES, ANALITOS_MASTER_DF, ANALITOS_OVERRIDES_DF = load_reference_tables()
 
 st.set_page_config(page_title="Aging Coach v3", layout="wide")
 st.title("Aging Coach v3 — Weighted Domain Engine")
@@ -118,9 +120,9 @@ def format_reference_range(ref_cfg):
     ref_low = ref_cfg.get("reference_low")
     ref_high = ref_cfg.get("reference_high")
 
-    if ref_low is not None and ref_high is not None:
+    if ref_low is not None and ref_high not in (None, float("inf")):
         return f"{ref_low}–{ref_high}"
-    if ref_low is not None:
+    if ref_low is not None and (ref_high is None or ref_high == float("inf")):
         return f">= {ref_low}"
     if ref_high is not None:
         return f"<= {ref_high}"
@@ -231,12 +233,12 @@ def get_default_input_value(key, current_values=None, default_sex="M"):
         return ""
 
     if "sex_specific" in cfg:
-        sex_cfg = cfg["sex_specific"].get(sex, cfg["sex_specific"].get("X", {}))
+        sex_cfg = cfg["sex_specific"].get(sex, cfg["sex_specific"].get("M", {}))
         val = sex_cfg.get("target_default")
     else:
         val = cfg.get("target_default")
 
-    if val is None:
+    if val is None or val == float("inf"):
         return ""
     return str(val)
 
@@ -356,9 +358,9 @@ def get_reference_config(key, all_values):
     if cfg is None:
         return None
 
-    sex = all_values.get("sex", "X")
+    sex = all_values.get("sex", "M")
     if "sex_specific" in cfg:
-        sex_cfg = cfg["sex_specific"].get(sex, cfg["sex_specific"].get("X", {}))
+        sex_cfg = cfg["sex_specific"].get(sex, cfg["sex_specific"].get("M", {}))
         merged = {k: v for k, v in cfg.items() if k != "sex_specific"}
         merged.update(sex_cfg)
         return merged
@@ -451,7 +453,7 @@ def score_from_reference(value, ref_cfg):
         return clamp(100.0 * (target - value) / max(target - critical_low, 1e-9))
 
     if direction == "outside_range_worse":
-        if ref_low is None or ref_high is None:
+        if ref_low is None or ref_high is None or ref_high == float("inf"):
             return np.nan
         if ref_low <= value <= ref_high:
             return 0.0
@@ -499,6 +501,8 @@ def score_variable(key, value, all_values):
         "classification": classification,
         "reference": ref_cfg,
         "note": ref_cfg.get("notes", ""),
+        "categoria_alto": ref_cfg.get("categoria_alto", ""),
+        "categoria_bajo": ref_cfg.get("categoria_bajo", ""),
     }
 
 
@@ -660,7 +664,7 @@ def rank_domains(domain_scores, all_values):
 def build_flags(all_values):
     flags = []
 
-    for key, cfg in REFERENCE_RANGES.items():
+    for key in REFERENCE_RANGES.keys():
         value = all_values.get(key, np.nan)
         if is_nan(value):
             continue
@@ -927,6 +931,13 @@ with st.expander("Ver variables fuera de rango", expanded=True):
         classification = info.get("classification", "missing")
         if classification in ("high", "critical_high", "low", "critical_low"):
             ref_cfg = get_reference_config(key, all_values)
+
+            categoria = ""
+            if classification in ("high", "critical_high"):
+                categoria = ref_cfg.get("categoria_alto", "")
+            elif classification in ("low", "critical_low"):
+                categoria = ref_cfg.get("categoria_bajo", "")
+
             altered.append({
                 "key": key,
                 "label": pretty_variable_label(key),
@@ -934,6 +945,7 @@ with st.expander("Ver variables fuera de rango", expanded=True):
                 "value": info.get("value"),
                 "classification": classification,
                 "range": format_reference_range(ref_cfg),
+                "categoria": categoria,
             })
 
     if not altered:
@@ -943,6 +955,7 @@ with st.expander("Ver variables fuera de rango", expanded=True):
             arrow = classification_to_arrow(item["classification"])
             badge = classification_to_badge(item["classification"])
             value_txt = "—" if is_nan(item["value"]) else f"{item['value']}"
+            subtitle = item["domain"] if not item["categoria"] else f"{item['domain']} · {item['categoria']}"
 
             st.markdown(
                 f"""
@@ -961,7 +974,7 @@ with st.expander("Ver variables fuera de rango", expanded=True):
                     ">
                         <div>
                             <div style="font-weight:700;font-size:1rem;">{item['label']}</div>
-                            <div style="color:#666;font-size:0.88rem;">{item['domain']}</div>
+                            <div style="color:#666;font-size:0.88rem;">{subtitle}</div>
                         </div>
                         <div>{badge}</div>
                     </div>
