@@ -117,7 +117,9 @@ def display_unit_label(item, unit_mode):
     return unit
 
 
-def input_widget(item, unit_mode, key_prefix="inp_"):
+def input_widget(item, unit_mode, current_values=None, key_prefix="inp_"):
+    current_values = current_values or {}
+
     key = item["key"]
     label = item["label"]
     unit = display_unit_label(item, unit_mode)
@@ -128,13 +130,30 @@ def input_widget(item, unit_mode, key_prefix="inp_"):
         options = item.get("options", [])
         option_labels = item.get("option_labels", {})
         shown = [option_labels.get(opt, opt) for opt in options]
-        selected = st.selectbox(label, shown, index=0, key=f"{key_prefix}{key}")
+
+        # Default inicial: Hombre
+        default_value = "M" if "M" in options else options[0]
+        default_index = options.index(default_value)
+
+        selected = st.selectbox(label, shown, index=default_index, key=f"{key_prefix}{key}")
         reverse = {option_labels.get(opt, opt): opt for opt in options}
         return reverse[selected]
 
+    default_str = get_default_input_value(key, current_values=current_values, default_sex="M")
+
+    # Si la unidad visible está en mmol/L, convertimos también el default
+    if default_str != "":
+        try:
+            default_numeric = float(default_str)
+            if convert_group in ("lipids", "triglycerides", "glucose") and unit_mode == "mmol/L":
+                default_numeric = mgdl_to_display(default_numeric, convert_group, unit_mode)
+                default_str = f"{default_numeric:.2f}"
+        except ValueError:
+            pass
+
     raw = st.text_input(
         f"{label} ({unit})",
-        value="",
+        value=default_str,
         key=f"{key_prefix}{key}",
         placeholder="vacío = desconocido",
     )
@@ -144,7 +163,6 @@ def input_widget(item, unit_mode, key_prefix="inp_"):
         val = display_to_mgdl(val, convert_group, unit_mode)
 
     return val
-
 
 # -----------------------------
 # Derived metrics
