@@ -204,7 +204,55 @@ def merge_values(values, derived):
     merged = dict(values)
     merged.update(derived)
     return merged
+##Nuevas funciones
+def classification_to_badge(classification: str) -> str:
+    if classification in ("high", "critical_high"):
+        label = "↑ Alto" if classification == "high" else "↑ Muy alto"
+        color = "#b00020"
+        bg = "#fde7ea"
+    elif classification in ("low", "critical_low"):
+        label = "↓ Bajo" if classification == "low" else "↓ Muy bajo"
+        color = "#b00020"
+        bg = "#fde7ea"
+    elif classification == "normal":
+        label = "✓ Normal"
+        color = "#0f6b2f"
+        bg = "#e8f5e9"
+    else:
+        label = "—"
+        color = "#666666"
+        bg = "#f2f2f2"
 
+    return (
+        f"<span style='display:inline-block;padding:0.18rem 0.5rem;border-radius:0.5rem;"
+        f"background:{bg};color:{color};font-weight:600;font-size:0.9rem;'>{label}</span>"
+    )
+
+
+def classification_to_arrow(classification: str) -> str:
+    if classification in ("high", "critical_high"):
+        return "↑"
+    if classification in ("low", "critical_low"):
+        return "↓"
+    if classification == "normal":
+        return "→"
+    return "—"
+
+
+def format_reference_range(ref_cfg):
+    if ref_cfg is None:
+        return "—"
+
+    ref_low = ref_cfg.get("reference_low")
+    ref_high = ref_cfg.get("reference_high")
+
+    if ref_low is not None and ref_high is not None:
+        return f"{ref_low}–{ref_high}"
+    if ref_low is not None:
+        return f">= {ref_low}"
+    if ref_high is not None:
+        return f"<= {ref_high}"
+    return "—"
 
 # -----------------------------
 # Reference-based variable scoring
