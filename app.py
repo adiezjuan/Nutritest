@@ -98,6 +98,17 @@ def get_default_input_value(key, current_values=None, default_sex="M"):
     if val is None:
         return ""
     return str(val)
+
+def pretty_variable_label(key: str) -> str:
+    ref = REFERENCE_RANGES.get(key, {})
+    return ref.get("label", key)
+
+def variable_main_domain(key: str) -> str:
+    for domain_key, cfg in DOMAIN_MASTER.items():
+        for var in cfg.get("variables", []):
+            if var.get("key") == key:
+                return cfg.get("label", domain_key)
+    return "Derivado/otro"
 # -----------------------------
 # UI helpers
 # -----------------------------
