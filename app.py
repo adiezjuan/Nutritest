@@ -12,7 +12,7 @@ st.set_page_config(page_title="Aging Coach v3", layout="wide")
 st.title("Aging Coach v3 — Weighted Domain Engine")
 st.caption(
     "⚠️ Prototipo educativo/I+D. No es diagnóstico ni prescripción. "
-    "Los umbrales y pesos son semillas ajustables."
+    "Los umbrales, pesos y reglas son semillas ajustables."
 )
 
 # -----------------------------
@@ -127,6 +127,73 @@ def format_reference_range(ref_cfg):
     return "—"
 
 
+def format_rule_conditions(conditions):
+    parts = []
+    for cond in conditions:
+        if "any" in cond:
+            sub = []
+            for c in cond["any"]:
+                sub.append(f"{c['key']} {c['op']} {c['value']}")
+            parts.append("(" + " OR ".join(sub) + ")")
+        else:
+            parts.append(f"{cond['key']} {cond['op']} {cond['value']}")
+    return " AND ".join(parts)
+
+
+def render_section_title(title: str, caption: str | None = None):
+    st.markdown(f"## {title}")
+    if caption:
+        st.caption(caption)
+
+
+def render_info_card(title: str, body: str, tone: str = "neutral"):
+    tones = {
+        "neutral": {"bg": "#f7f7f8", "border": "#e5e7eb", "title": "#111827"},
+        "good": {"bg": "#eefaf1", "border": "#cdebd4", "title": "#166534"},
+        "warn": {"bg": "#fff7ed", "border": "#fed7aa", "title": "#9a3412"},
+        "danger": {"bg": "#fef2f2", "border": "#fecaca", "title": "#991b1b"},
+    }
+    t = tones.get(tone, tones["neutral"])
+
+    st.markdown(
+        f"""
+        <div style="
+            padding:0.9rem 1rem;
+            margin:0.35rem 0 0.75rem 0;
+            border:1px solid {t['border']};
+            border-radius:0.85rem;
+            background:{t['bg']};
+        ">
+            <div style="font-weight:700;color:{t['title']};margin-bottom:0.3rem;">{title}</div>
+            <div>{body}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def render_kv_card(title: str, items: list[tuple[str, str]]):
+    rows = "".join(
+        f"<div style='padding:0.15rem 0;'><b>{k}:</b> {v}</div>"
+        for k, v in items
+    )
+    st.markdown(
+        f"""
+        <div style="
+            padding:0.8rem 0.95rem;
+            margin:0.35rem 0 0.75rem 0;
+            border:1px solid #e5e7eb;
+            border-radius:0.85rem;
+            background:white;
+        ">
+            <div style="font-weight:700;margin-bottom:0.35rem;">{title}</div>
+            {rows}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def mgdl_to_display(x_mgdl: float, convert_group: str, unit_mode: str) -> float:
     if is_nan(x_mgdl):
         return x_mgdl
@@ -172,17 +239,7 @@ def get_default_input_value(key, current_values=None, default_sex="M"):
     if val is None:
         return ""
     return str(val)
-def format_rule_conditions(conditions):
-    parts = []
-    for cond in conditions:
-        if "any" in cond:
-            sub = []
-            for c in cond["any"]:
-                sub.append(f"{c['key']} {c['op']} {c['value']}")
-            parts.append("(" + " OR ".join(sub) + ")")
-        else:
-            parts.append(f"{cond['key']} {cond['op']} {cond['value']}")
-    return " AND ".join(parts)
+
 
 # -----------------------------
 # UI helpers
@@ -704,6 +761,7 @@ if st.sidebar.button("Reset a valores normales"):
         st.session_state.pop(f"inp_{item['key']}", None)
     st.rerun()
 
+
 # -----------------------------
 # Input rendering
 # -----------------------------
@@ -729,6 +787,7 @@ values["alcohol"] = alcohol
 values["sleep"] = sleep
 values["meds"] = meds
 
+
 # -----------------------------
 # Engine execution
 # -----------------------------
@@ -741,48 +800,74 @@ priority_now = build_priority_now(ranked_domains, all_values)
 flags = build_flags(all_values)
 conf_label, conf_value = confidence_level(domain_scores)
 
+
 # -----------------------------
 # Output
 # -----------------------------
 st.markdown("---")
-st.subheader("Resumen ejecutivo")
+render_section_title(
+    "Resumen ejecutivo",
+    "Lectura sintética del perfil actual basada en dominios, reglas de prioridad y cobertura."
+)
 
-left, right = st.columns([1.7, 1.0])
+left, right = st.columns([1.6, 1.0], gap="large")
 
 with left:
     if priority_now["primary"] is not None:
-        st.markdown(f"### Prioridad principal: **{priority_now['primary']['label']}**")
+        summary_body = []
+        summary_body.append(f"<b>Prioridad principal:</b> {priority_now['primary']['label']}")
+        if priority_now["secondary"] is not None:
+            summary_body.append(f"<b>Dominio secundario:</b> {priority_now['secondary']['label']}")
         if priority_now["combination_label"]:
-            st.write(priority_now["combination_label"])
+            summary_body.append(f"<b>Tipo de perfil:</b> {priority_now['combination_label']}")
         else:
-            st.write(priority_now["profile"])
+            summary_body.append(f"<b>Tipo de perfil:</b> {priority_now['profile']}")
+        summary_body.append(f"<b>Palanca principal:</b> {priority_now['main_lever']}")
+        summary_body.append(f"<b>Patrón sugerido:</b> {priority_now['pattern']}")
+        summary_body.append(f"<b>Confianza del análisis:</b> {conf_label} ({int(conf_value * 100)}% de cobertura media)")
 
-        st.markdown(f"**Palanca principal:** {priority_now['main_lever']}")
-        st.markdown(f"**Patrón sugerido:** {priority_now['pattern']}")
-        st.markdown(f"**Confianza del análisis:** {conf_label}")
-        st.caption(f"Cobertura media del motor: {int(conf_value * 100)}%")
+        render_info_card(
+            "Tu prioridad ahora",
+            "<br>".join(summary_body),
+            tone="neutral"
+        )
     else:
-        st.write("Faltan datos esenciales para generar una prioridad útil.")
+        render_info_card(
+            "Sin datos suficientes",
+            "Faltan datos esenciales para generar una prioridad útil.",
+            tone="warn"
+        )
 
 with right:
-    if priority_now["secondary"] is not None:
-        st.info(
-            f"**Secundario:** {priority_now['secondary']['label']}\n\n"
-            f"**Score primario:** {priority_now['primary']['score']:.1f}\n\n"
-            f"**Score secundario:** {priority_now['secondary']['score']:.1f}"
+    if priority_now["primary"] is not None:
+        render_kv_card(
+            "Resumen rápido",
+            [
+                ("Score primario", f"{priority_now['primary']['score']:.1f}"),
+                ("Score secundario", f"{priority_now['secondary']['score']:.1f}" if priority_now["secondary"] else "—"),
+                ("Cobertura media", f"{int(conf_value * 100)}%"),
+            ]
         )
 
 if forced_reason:
-    st.warning(forced_reason)
+    render_info_card("Prioridad forzada", forced_reason, tone="warn")
 
 if boost_reasons:
-    st.info("Ajustes de prioridad aplicados:\n- " + "\n- ".join(boost_reasons))
+    render_info_card(
+        "Ajustes de prioridad aplicados",
+        "<br>".join(f"• {r}" for r in boost_reasons),
+        tone="neutral"
+    )
 
 if flags:
-    st.error("⚠️ Señales para revisión profesional:\n- " + "\n- ".join(flags))
+    render_info_card(
+        "Señales para revisión profesional",
+        "<br>".join(f"• {f}" for f in flags),
+        tone="danger"
+    )
 
 st.markdown("---")
-st.subheader("Ranking de dominios")
+render_section_title("Ranking de dominios")
 
 if ranked_domains:
     cols = st.columns(min(6, len(ranked_domains)))
@@ -797,19 +882,20 @@ if ranked_domains:
             st.caption(f"Cobertura: {int(domain['coverage'] * 100)}%")
 
 st.markdown("---")
-st.subheader("Tu prioridad ahora")
+render_section_title("Plan actual")
 
 if priority_now["primary"] is not None:
-    st.markdown(f"**1. Dominio principal:** {priority_now['primary']['label']}")
-    if priority_now["secondary"] is not None:
-        st.markdown(f"**2. Dominio secundario:** {priority_now['secondary']['label']}")
-    st.markdown(f"**3. Tipo de perfil:** {priority_now['profile']}")
-    st.markdown(f"**4. Palanca principal:** {priority_now['main_lever']}")
+    plan_items = [
+        ("Dominio principal", priority_now["primary"]["label"]),
+        ("Dominio secundario", priority_now["secondary"]["label"] if priority_now["secondary"] else "—"),
+        ("Tipo de perfil", priority_now["profile"]),
+        ("Palanca principal", priority_now["main_lever"]),
+        ("Qué repetir", priority_now["repeat"]),
+    ]
     if priority_now["extra_action"]:
-        st.markdown(f"**5. Ajuste por combinación:** {priority_now['extra_action']}")
-        st.markdown(f"**6. Qué repetir:** {priority_now['repeat']}")
-    else:
-        st.markdown(f"**5. Qué repetir:** {priority_now['repeat']}")
+        plan_items.insert(4, ("Ajuste por combinación", priority_now["extra_action"]))
+
+    render_kv_card("Lectura operativa", plan_items)
 
 st.markdown("### Acciones sugeridas")
 if priority_now["actions"]:
@@ -819,16 +905,84 @@ else:
     st.write("- Sin acciones específicas por falta de datos.")
 
 st.markdown("---")
-st.subheader("Derivados")
+render_section_title("Derivados calculados")
 
 with st.expander("Ver derivados", expanded=False):
-    st.write(f"- TG/HDL: {derived['tg_hdl_ratio']:.2f}" if not is_nan(derived["tg_hdl_ratio"]) else "- TG/HDL: —")
-    st.write(f"- No-HDL: {derived['non_hdl_mg_dl']:.0f} mg/dL" if not is_nan(derived["non_hdl_mg_dl"]) else "- No-HDL: —")
-    st.write(f"- HOMA-IR: {derived['homa_ir']:.2f}" if not is_nan(derived["homa_ir"]) else "- HOMA-IR: —")
-    st.write(f"- NLR: {derived['nlr']:.2f}" if not is_nan(derived["nlr"]) else "- NLR: —")
+    derived_rows = [
+        ("TG/HDL", f"{derived['tg_hdl_ratio']:.2f}" if not is_nan(derived["tg_hdl_ratio"]) else "—"),
+        ("No-HDL", f"{derived['non_hdl_mg_dl']:.0f} mg/dL" if not is_nan(derived["non_hdl_mg_dl"]) else "—"),
+        ("HOMA-IR", f"{derived['homa_ir']:.2f}" if not is_nan(derived["homa_ir"]) else "—"),
+        ("NLR", f"{derived['nlr']:.2f}" if not is_nan(derived["nlr"]) else "—"),
+    ]
+    for k, v in derived_rows:
+        st.write(f"- {k}: {v}")
 
 st.markdown("---")
-st.subheader("Transparencia del motor")
+render_section_title("Variables fuera de rango")
+
+with st.expander("Ver variables fuera de rango", expanded=True):
+    altered = []
+
+    for key, info in variable_scores.items():
+        classification = info.get("classification", "missing")
+        if classification in ("high", "critical_high", "low", "critical_low"):
+            ref_cfg = get_reference_config(key, all_values)
+            altered.append({
+                "key": key,
+                "label": pretty_variable_label(key),
+                "domain": variable_main_domain(key),
+                "value": info.get("value"),
+                "classification": classification,
+                "range": format_reference_range(ref_cfg),
+            })
+
+    if not altered:
+        st.success("No hay variables fuera de rango en los inputs disponibles.")
+    else:
+        for item in altered:
+            arrow = classification_to_arrow(item["classification"])
+            badge = classification_to_badge(item["classification"])
+            value_txt = "—" if is_nan(item["value"]) else f"{item['value']}"
+
+            st.markdown(
+                f"""
+                <div style="
+                    padding:0.8rem 0.95rem;
+                    margin:0.45rem 0;
+                    border:1px solid #e5e7eb;
+                    border-radius:0.85rem;
+                    background:white;
+                ">
+                    <div style="
+                        display:flex;
+                        justify-content:space-between;
+                        align-items:flex-start;
+                        gap:1rem;
+                    ">
+                        <div>
+                            <div style="font-weight:700;font-size:1rem;">{item['label']}</div>
+                            <div style="color:#666;font-size:0.88rem;">{item['domain']}</div>
+                        </div>
+                        <div>{badge}</div>
+                    </div>
+
+                    <div style="
+                        display:grid;
+                        grid-template-columns: repeat(2, minmax(160px, 1fr));
+                        gap:0.55rem 1rem;
+                        margin-top:0.7rem;
+                        font-size:0.95rem;
+                    ">
+                        <div><b>Valor:</b> {value_txt} {arrow}</div>
+                        <div><b>Rango:</b> {item['range']}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+st.markdown("---")
+render_section_title("Transparencia del motor")
 
 with st.expander("Scores por dominio", expanded=False):
     for d in ranked_domains:
@@ -854,10 +1008,16 @@ with st.expander("Variables usadas por dominio", expanded=False):
 
             st.markdown(
                 f"""
-                <div style="padding:0.45rem 0.65rem; margin:0.35rem 0; border:1px solid #e8e8e8; border-radius:0.6rem;">
-                    <div style="font-weight:600;">{pretty_variable_label(key)}</div>
-                    <div style="margin-top:0.2rem;">
-                        <span style="font-size:1rem;"><b>Valor:</b> {val_txt} {arrow}</span>
+                <div style="
+                    padding:0.6rem 0.75rem;
+                    margin:0.35rem 0;
+                    border:1px solid #e8e8e8;
+                    border-radius:0.7rem;
+                    background:white;
+                ">
+                    <div style="font-weight:700;">{pretty_variable_label(key)}</div>
+                    <div style="margin-top:0.25rem;">
+                        <span><b>Valor:</b> {val_txt} {arrow}</span>
                         <span style="margin-left:1rem;"><b>Rango:</b> {ref_range}</span>
                         <span style="margin-left:1rem;"><b>Peso:</b> {item['weight']}</span>
                         <span style="margin-left:1rem;"><b>Rol:</b> {item['role']}</span>
@@ -869,7 +1029,7 @@ with st.expander("Variables usadas por dominio", expanded=False):
             )
 
 with st.expander("Tabla de ponderación actual", expanded=False):
-    for domain_key, cfg in DOMAIN_MASTER.items():
+    for _, cfg in DOMAIN_MASTER.items():
         st.markdown(f"### {cfg['label']}")
         st.caption(cfg["definition"])
 
@@ -883,20 +1043,10 @@ with st.expander("Tabla de ponderación actual", expanded=False):
                 "Notas": var.get("notes", ""),
             })
 
-        st.dataframe(
-            rows,
-            use_container_width=True,
-            hide_index=True,
-        )
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+        st.caption(f"Override de prioridad: {'Sí' if cfg.get('priority_override', False) else 'No'}")
 
-        override_txt = "Sí" if cfg.get("priority_override", False) else "No"
-        st.caption(f"Override de prioridad: {override_txt}")
-st.markdown("---")
-st.subheader("Variables alteradas")
-st.markdown("---")
-st.subheader("Reglas de prioridad")
-
-with st.expander("Ver reglas de prioridad y boosts", expanded=False):
+with st.expander("Reglas de prioridad y boosts", expanded=False):
     rows = []
     for rule in PRIORITY_RULES:
         rows.append({
@@ -909,84 +1059,10 @@ with st.expander("Ver reglas de prioridad y boosts", expanded=False):
             "Razón": rule.get("reason", ""),
         })
 
-    st.dataframe(
-        rows,
-        use_container_width=True,
-        hide_index=True,
-    )
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
 st.markdown("---")
-st.subheader("Variables fuera de rango")
-
-with st.expander("Ver variables fuera de rango", expanded=True):
-    altered = []
-
-    for key, info in variable_scores.items():
-        classification = info.get("classification", "missing")
-        if classification in ("high", "critical_high", "low", "critical_low"):
-            ref_cfg = get_reference_config(key, all_values)
-            altered.append({
-                "key": key,
-                "label": pretty_variable_label(key),
-                "domain": variable_main_domain(key),
-                "value": info.get("value"),
-                "classification": classification,
-                "range": format_reference_range(ref_cfg),
-            })
-
-    if not altered:
-        st.success("No hay variables fuera de rango en los inputs disponibles.")
-    else:
-        for item in altered:
-            arrow = classification_to_arrow(item["classification"])
-            badge = classification_to_badge(item["classification"])
-
-            value_txt = "—" if is_nan(item["value"]) else f"{item['value']}"
-
-            st.markdown(
-                f"""
-                <div style="
-                    padding: 0.75rem 0.9rem;
-                    margin: 0.45rem 0;
-                    border: 1px solid #e6e6e6;
-                    border-radius: 0.75rem;
-                    background: white;
-                ">
-                    <div style="
-                        display:flex;
-                        justify-content:space-between;
-                        align-items:flex-start;
-                        gap:1rem;
-                    ">
-                        <div>
-                            <div style="font-weight:700; font-size:1rem; margin-bottom:0.15rem;">
-                                {item['label']}
-                            </div>
-                            <div style="color:#666; font-size:0.88rem;">
-                                {item['domain']}
-                            </div>
-                        </div>
-                        <div>
-                            {badge}
-                        </div>
-                    </div>
-
-                    <div style="
-                        display:grid;
-                        grid-template-columns: repeat(2, minmax(140px, 1fr));
-                        gap: 0.5rem 1rem;
-                        margin-top: 0.7rem;
-                        font-size: 0.95rem;
-                    ">
-                        <div><b>Valor:</b> {value_txt} {arrow}</div>
-                        <div><b>Rango:</b> {item['range']}</div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-   
-st.markdown("---")
-st.subheader("Tabla de referencia por defecto")
+render_section_title("Tabla de referencia por defecto")
 
 with st.expander("Ver rangos, objetivos y umbrales", expanded=False):
     for key, cfg in REFERENCE_RANGES.items():
