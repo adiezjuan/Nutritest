@@ -109,6 +109,7 @@ def variable_main_domain(key: str) -> str:
             if var.get("key") == key:
                 return cfg.get("label", domain_key)
     return "Derivado/otro"
+    
 # -----------------------------
 # UI helpers
 # -----------------------------
@@ -840,6 +841,9 @@ st.subheader("Tabla de referencia por defecto")
 # st.markdown("---")
 st.subheader("Variables alteradas")
 
+st.markdown("---")
+st.subheader("Variables alteradas")
+
 with st.expander("Ver variables fuera de rango", expanded=True):
     altered = []
     for key, info in variable_scores.items():
@@ -848,6 +852,8 @@ with st.expander("Ver variables fuera de rango", expanded=True):
             ref_cfg = get_reference_config(key, all_values)
             altered.append({
                 "key": key,
+                "label": pretty_variable_label(key),
+                "domain": variable_main_domain(key),
                 "value": info.get("value"),
                 "classification": classification,
                 "range": format_reference_range(ref_cfg),
@@ -861,13 +867,31 @@ with st.expander("Ver variables fuera de rango", expanded=True):
             arrow = classification_to_arrow(item["classification"])
             st.markdown(
                 f"""
-                <div style="padding:0.45rem 0.65rem; margin:0.35rem 0; border:1px solid #e8e8e8; border-radius:0.6rem;">
-                    <div style="font-weight:600;">{item['key']}</div>
-                    <div style="margin-top:0.2rem;">
-                        <span><b>Valor:</b> {item['value']} {arrow}</span>
-                        <span style="margin-left:1rem;"><b>Rango:</b> {item['range']}</span>
+                <div style="
+                    padding:0.65rem 0.8rem;
+                    margin:0.4rem 0;
+                    border:1px solid #e6e6e6;
+                    border-radius:0.7rem;
+                    background:#ffffff;
+                ">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+                        <div>
+                            <div style="font-weight:700; font-size:1rem;">{item['label']}</div>
+                            <div style="color:#666; font-size:0.88rem;">{item['domain']}</div>
+                        </div>
+                        <div>{item['badge']}</div>
                     </div>
-                    <div style="margin-top:0.35rem;">{item['badge']}</div>
+
+                    <div style="
+                        display:grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap:0.5rem 1rem;
+                        margin-top:0.55rem;
+                        font-size:0.95rem;
+                    ">
+                        <div><b>Valor:</b> {item['value']} {arrow}</div>
+                        <div><b>Rango:</b> {item['range']}</div>
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -899,3 +923,6 @@ with st.expander("Ver rangos, objetivos y umbrales", expanded=False):
                 f"critical_low={cfg.get('critical_low')}, "
                 f"critical_high={cfg.get('critical_high')}"
             )
+st.markdown("---")
+st.subheader("Variables alteradas")
+
