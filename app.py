@@ -172,7 +172,17 @@ def get_default_input_value(key, current_values=None, default_sex="M"):
     if val is None:
         return ""
     return str(val)
-
+def format_rule_conditions(conditions):
+    parts = []
+    for cond in conditions:
+        if "any" in cond:
+            sub = []
+            for c in cond["any"]:
+                sub.append(f"{c['key']} {c['op']} {c['value']}")
+            parts.append("(" + " OR ".join(sub) + ")")
+        else:
+            parts.append(f"{cond['key']} {cond['op']} {cond['value']}")
+    return " AND ".join(parts)
 
 # -----------------------------
 # UI helpers
@@ -859,11 +869,51 @@ with st.expander("Variables usadas por dominio", expanded=False):
             )
 
 with st.expander("Tabla de ponderación actual", expanded=False):
-    st.json(DOMAIN_MASTER)
+    for domain_key, cfg in DOMAIN_MASTER.items():
+        st.markdown(f"### {cfg['label']}")
+        st.caption(cfg["definition"])
 
+        rows = []
+        for var in cfg.get("variables", []):
+            rows.append({
+                "Variable": pretty_variable_label(var["key"]),
+                "Rol": var.get("role", ""),
+                "Dirección": var.get("effect_direction", ""),
+                "Peso": var.get("weight", 0),
+                "Notas": var.get("notes", ""),
+            })
+
+        st.dataframe(
+            rows,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        override_txt = "Sí" if cfg.get("priority_override", False) else "No"
+        st.caption(f"Override de prioridad: {override_txt}")
 st.markdown("---")
 st.subheader("Variables alteradas")
+st.markdown("---")
+st.subheader("Reglas de prioridad")
 
+with st.expander("Ver reglas de prioridad y boosts", expanded=False):
+    rows = []
+    for rule in PRIORITY_RULES:
+        rows.append({
+            "ID": rule.get("id", ""),
+            "Dominio": DOMAIN_MASTER.get(rule.get("domain", ""), {}).get("label", rule.get("domain", "")),
+            "Tipo": rule.get("type", ""),
+            "Prioridad": rule.get("priority", ""),
+            "Boost": rule.get("boost", ""),
+            "Condiciones": format_rule_conditions(rule.get("conditions", [])),
+            "Razón": rule.get("reason", ""),
+        })
+
+    st.dataframe(
+        rows,
+        use_container_width=True,
+        hide_index=True,
+    )
 with st.expander("Ver variables fuera de rango", expanded=True):
     altered = []
     for key, info in variable_scores.items():
